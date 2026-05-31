@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AEROCRAFT — Flight Simulator</title>
+
+  <!-- CesiumJS -->
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- CESIUM VIEWPORT -->
+  <div id="cesiumContainer"></div>
+
+  <!-- HUD OVERLAY -->
+  <div id="hud">
+    <!-- Top bar -->
+    <div class="hud-topbar">
+      <div class="hud-logo">✈ AEROCRAFT</div>
+      <div class="hud-aircraft-name" id="hudAircraftName">NO AIRCRAFT</div>
+      <div class="hud-clock" id="hudClock">00:00:00Z</div>
+    </div>
+
+    <!-- Left instruments -->
+    <div class="hud-left">
+      <div class="instrument-panel">
+        <div class="instr-label">ALTITUDE</div>
+        <div class="instr-value" id="hudAltitude">0</div>
+        <div class="instr-unit">ft</div>
+      </div>
+      <div class="instrument-panel">
+        <div class="instr-label">AIRSPEED</div>
+        <div class="instr-value" id="hudSpeed">0</div>
+        <div class="instr-unit">kts</div>
+      </div>
+      <div class="instrument-panel">
+        <div class="instr-label">VERTICAL SPD</div>
+        <div class="instr-value" id="hudVSpeed">0</div>
+        <div class="instr-unit">fpm</div>
+      </div>
+      <div class="instrument-panel">
+        <div class="instr-label">HEADING</div>
+        <div class="instr-value" id="hudHeading">000</div>
+        <div class="instr-unit">°</div>
+      </div>
+    </div>
+
+    <!-- Right instruments -->
+    <div class="hud-right">
+      <div class="instrument-panel">
+        <div class="instr-label">THROTTLE</div>
+        <div class="instr-bar-wrap">
+          <div class="instr-bar" id="throttleBar"></div>
+        </div>
+        <div class="instr-value" id="hudThrottle">0</div>
+        <div class="instr-unit">%</div>
+      </div>
+      <div class="instrument-panel">
+        <div class="instr-label">PITCH</div>
+        <div class="instr-value" id="hudPitch">0.0</div>
+        <div class="instr-unit">°</div>
+      </div>
+      <div class="instrument-panel">
+        <div class="instr-label">BANK</div>
+        <div class="instr-value" id="hudBank">0.0</div>
+        <div class="instr-unit">°</div>
+      </div>
+      <div class="instrument-panel ap-panel" id="apPanel">
+        <div class="instr-label">AUTOPILOT</div>
+        <div class="ap-status" id="apStatus">OFF</div>
+      </div>
+    </div>
+
+    <!-- Bottom controls hint -->
+    <div class="hud-bottom">
+      <div class="ctrl-hints">
+        <span><kbd>W/S</kbd> Throttle</span>
+        <span><kbd>↑↓</kbd> Pitch</span>
+        <span><kbd>←→</kbd> Bank</span>
+        <span><kbd>Q/E</kbd> Rudder</span>
+        <span><kbd>G</kbd> Gear</span>
+        <span><kbd>F</kbd> Flaps</span>
+        <span><kbd>C</kbd> Camera</span>
+        <span><kbd>P</kbd> Autopilot</span>
+        <span><kbd>M</kbd> Menu</span>
+      </div>
+    </div>
+
+    <!-- Gear / Flaps indicators -->
+    <div class="hud-status-row">
+      <div class="status-badge" id="gearBadge">GEAR DOWN</div>
+      <div class="status-badge" id="flapsBadge">FLAPS 0</div>
+      <div class="status-badge" id="cameraBadge">CHASE CAM</div>
+    </div>
+
+    <!-- Warnings -->
+    <div class="warning-overlay" id="warningOverlay"></div>
+
+    <!-- Autopilot target display -->
+    <div class="ap-targets" id="apTargets" style="display:none">
+      <div class="ap-row"><span>AP HDG</span><span id="apHdgVal">---</span>°</div>
+      <div class="ap-row"><span>AP ALT</span><span id="apAltVal">---</span>ft</div>
+      <div class="ap-row"><span>AP SPD</span><span id="apSpdVal">---</span>kts</div>
+    </div>
+  </div>
+
+  <!-- SPAWN MENU -->
+  <div class="modal-backdrop" id="menuBackdrop"></div>
+  <div class="spawn-menu" id="spawnMenu">
+    <div class="menu-header">
+      <div class="menu-title">✈ AIRCRAFT SPAWN</div>
+      <button class="menu-close" id="menuClose">✕</button>
+    </div>
+
+    <div class="menu-section">
+      <div class="section-title">SELECT AIRCRAFT</div>
+      <div class="aircraft-grid" id="aircraftGrid">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <div class="menu-section">
+      <div class="section-title">SPAWN LOCATION</div>
+      <div class="location-grid">
+        <button class="loc-btn active" data-loc="kennedy">JFK New York</button>
+        <button class="loc-btn" data-loc="heathrow">LHR London</button>
+        <button class="loc-btn" data-loc="dubai">DXB Dubai</button>
+        <button class="loc-btn" data-loc="sydney">SYD Sydney</button>
+        <button class="loc-btn" data-loc="tokyo">HND Tokyo</button>
+        <button class="loc-btn" data-loc="paris">CDG Paris</button>
+        <button class="loc-btn" data-loc="custom">Custom Coords</button>
+      </div>
+      <div class="custom-coords" id="customCoords" style="display:none">
+        <input type="number" id="customLat" placeholder="Latitude" step="0.0001" />
+        <input type="number" id="customLon" placeholder="Longitude" step="0.0001" />
+        <input type="number" id="customAlt" placeholder="Altitude (ft)" value="2000" />
+      </div>
+    </div>
+
+    <div class="menu-section">
+      <div class="section-title">SPAWN SETTINGS</div>
+      <div class="settings-row">
+        <label>Initial Speed (kts)</label>
+        <input type="number" id="spawnSpeed" value="200" min="0" max="600" />
+      </div>
+      <div class="settings-row">
+        <label>Initial Heading (°)</label>
+        <input type="number" id="spawnHeading" value="090" min="0" max="360" />
+      </div>
+      <div class="settings-row">
+        <label>Initial Altitude (ft)</label>
+        <input type="number" id="spawnAltitude" value="10000" min="0" max="60000" />
+      </div>
+    </div>
+
+    <button class="spawn-btn" id="spawnBtn">SPAWN AIRCRAFT</button>
+
+    <div class="menu-section" style="margin-top:8px">
+      <div class="section-title">CESIUM ION TOKEN</div>
+      <div class="token-row">
+        <input type="text" id="cesiumToken" placeholder="Paste your Cesium Ion access token..." />
+        <button class="token-btn" id="tokenApplyBtn">APPLY</button>
+      </div>
+      <div class="token-hint">Get your token at <a href="https://ion.cesium.com" target="_blank">ion.cesium.com</a></div>
+    </div>
+  </div>
+
+  <!-- AUTOPILOT PANEL -->
+  <div class="ap-modal" id="apModal" style="display:none">
+    <div class="ap-header">
+      <span>⊕ AUTOPILOT CONTROL</span>
+      <button class="ap-close" id="apClose">✕</button>
+    </div>
+    <div class="ap-controls">
+      <div class="ap-ctrl-row">
+        <label>TARGET HEADING</label>
+        <div class="ap-knob-row">
+          <button class="ap-adj" data-field="heading" data-delta="-10">◀◀</button>
+          <button class="ap-adj" data-field="heading" data-delta="-1">◀</button>
+          <span class="ap-val" id="apHdgInput">090</span>°
+          <button class="ap-adj" data-field="heading" data-delta="1">▶</button>
+          <button class="ap-adj" data-field="heading" data-delta="10">▶▶</button>
+        </div>
+        <label class="ap-toggle-label">
+          <input type="checkbox" id="apHdgEnabled" /> HDG HOLD
+        </label>
+      </div>
+      <div class="ap-ctrl-row">
+        <label>TARGET ALTITUDE (ft)</label>
+        <div class="ap-knob-row">
+          <button class="ap-adj" data-field="altitude" data-delta="-1000">◀◀</button>
+          <button class="ap-adj" data-field="altitude" data-delta="-100">◀</button>
+          <span class="ap-val" id="apAltInput">10000</span>ft
+          <button class="ap-adj" data-field="altitude" data-delta="100">▶</button>
+          <button class="ap-adj" data-field="altitude" data-delta="1000">▶▶</button>
+        </div>
+        <label class="ap-toggle-label">
+          <input type="checkbox" id="apAltEnabled" /> ALT HOLD
+        </label>
+      </div>
+      <div class="ap-ctrl-row">
+        <label>TARGET SPEED (kts)</label>
+        <div class="ap-knob-row">
+          <button class="ap-adj" data-field="speed" data-delta="-10">◀◀</button>
+          <button class="ap-adj" data-field="speed" data-delta="-1">◀</button>
+          <span class="ap-val" id="apSpdInput">250</span>kts
+          <button class="ap-adj" data-field="speed" data-delta="1">▶</button>
+          <button class="ap-adj" data-field="speed" data-delta="10">▶▶</button>
+        </div>
+        <label class="ap-toggle-label">
+          <input type="checkbox" id="apSpdEnabled" /> SPD HOLD
+        </label>
+      </div>
+      <div class="ap-activate-row">
+        <button class="ap-engage-btn" id="apEngageBtn">ENGAGE AUTOPILOT</button>
+        <div class="ap-state-indicator" id="apStateIndicator">DISENGAGED</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/aircraft-registry.js"></script>
+  <script src="js/flight-physics.js"></script>
+  <script src="js/autopilot.js"></script>
+  <script src="js/camera.js"></script>
+  <script src="js/hud.js"></script>
+  <script src="js/input.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
